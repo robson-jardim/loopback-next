@@ -3,13 +3,15 @@
 // This file is licensed under the MIT License.
 // License text available at https://opensource.org/licenses/MIT
 
-import {BindingScope, inject} from '@loopback/context';
+import {BindingScope, createBindingFromClass, inject} from '@loopback/context';
 import {Application, Component, CoreBindings} from '@loopback/core';
 import {
   ApplicationMetadataBooter,
+  ConfigurationBooter,
   ControllerBooter,
   DataSourceBooter,
   InterceptorProviderBooter,
+  JsYamlJsonLoader,
   LifeCycleObserverBooter,
   ModelApiBooter,
   ModelBooter,
@@ -37,7 +39,10 @@ export class BootComponent implements Component {
     InterceptorProviderBooter,
     ModelApiBooter,
     ModelBooter,
+    ConfigurationBooter,
   ];
+
+  bindings = [createBindingFromClass(JsYamlJsonLoader)];
 
   /**
    *
