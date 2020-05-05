@@ -86,7 +86,8 @@ describe('configuration booter acceptance tests', function () {
   it('allows extensions to load configurations', async () => {
     @configurationLoader()
     class MyConfigLoader implements ConfigurationLoader {
-      fileExtensions?: string[];
+      options = {};
+
       load(_app: Application, projectRoot: string, files: string[]) {
         app.configure('loggers.Log1').to({
           level: 'info',
