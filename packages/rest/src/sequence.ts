@@ -4,8 +4,8 @@
 // License text available at https://opensource.org/licenses/MIT
 
 const debug = require('debug')('loopback:rest:sequence');
-import {inject, ValueOrPromise} from '@loopback/context';
-import {InvokeMiddleware} from '@loopback/express';
+import {config, inject, ValueOrPromise} from '@loopback/context';
+import {InvokeMiddleware, InvokeMiddlewareOptions} from '@loopback/express';
 import {RestBindings} from './keys';
 import {RequestContext} from './request-context';
 import {FindRoute, InvokeMethod, ParseParams, Reject, Send} from './types';
@@ -119,5 +119,74 @@ export class DefaultSequence implements SequenceHandler {
     } catch (error) {
       this.reject(context, error);
     }
+  }
+}
+
+/**
+ * A sequence implementation using middleware chains
+ */
+export class MiddlewareSequence implements SequenceHandler {
+  static defaultOptions: InvokeMiddlewareOptions = {
+    chain: 'middlewareChain.rest',
+    orderedGroups: [
+      // Please note that middleware is cascading. The `SendResponse` is
+      // added first to invoke downstream middleware to get the result or
+      // catch errors so that it can produce the http response.
+      'sendResponse',
+
+      // default
+      'cors',
+      'apiSpec',
+
+      // default
+      'middleware',
+
+      // auth
+      'authentication',
+
+      // rest
+      'findRoute',
+      'parseParams',
+      'invokeMethod',
+    ],
+  };
+
+  /**
+   * Constructor: Injects findRoute, invokeMethod & logError
+   * methods as promises.
+   *
+   * @param invokeMiddleware - invoker for registered middleware in a chain.
+   * To be injected via SequenceActions.INVOKE_MIDDLEWARE.
+   */
+  constructor(
+    @inject(SequenceActions.INVOKE_MIDDLEWARE)
+    readonly invokeMiddleware: InvokeMiddleware,
+    @config()
+    readonly options: InvokeMiddlewareOptions = MiddlewareSequence.defaultOptions,
+  ) {}
+
+  /**
+   * Runs the default sequence. Given a handler context (request and response),
+   * running the sequence will produce a response or an error.
+   *
+   * Default sequence executes these steps
+   *  - Finds the appropriate controller method, swagger spec
+   *    and args for invocation
+   *  - Parses HTTP request to get API argument list
+   *  - Invokes the API which is defined in the Application Controller
+   *  - Writes the result from API into the HTTP response
+   *  - Error is caught and logged using 'logError' if any of the above steps
+   *    in the sequence fails with an error.
+   *
+   * @param context - The request context: HTTP request and response objects,
+   * per-request IoC container and more.
+   */
+  async handle(context: RequestContext): Promise<void> {
+    debug(
+      'Invoking middleware chain %s with groups %s',
+      this.options.chain,
+      this.options.orderedGroups,
+    );
+    await this.invokeMiddleware(context, this.options);
   }
 }
