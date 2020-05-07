@@ -6,7 +6,7 @@
 import {BootMixin} from '@loopback/boot';
 import {ApplicationConfig} from '@loopback/core';
 import {RepositoryMixin} from '@loopback/repository';
-import {RestApplication} from '@loopback/rest';
+import {RestApplication, RestTags} from '@loopback/rest';
 import {RestExplorerComponent} from '@loopback/rest-explorer';
 import {ServiceMixin} from '@loopback/service-proxy';
 import morgan from 'morgan';
@@ -62,6 +62,7 @@ export class TodoListApplication extends BootMixin(
     this.expressMiddleware(morganFactory, defaultConfig, {
       injectConfiguration: 'watch',
       key: 'middleware.morgan',
+      chain: RestTags.REST_MIDDLEWARE_CHAIN,
     });
   }
 }
