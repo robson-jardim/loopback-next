@@ -3,7 +3,19 @@
 // This file is licensed under the MIT License.
 // License text available at https://opensource.org/licenses/MIT
 
-import {Count, DataObject, Entity, Filter, Options, Where} from '../..';
+import {
+  constrainDataObject,
+  constrainFilter,
+  constrainWhere,
+  Count,
+  DataObject,
+  Entity,
+  EntityCrudRepository,
+  Filter,
+  Getter,
+  Options,
+  Where,
+} from '../..';
 
 /**
  * CRUD operations for a target repository of a HasManyThrough relation
@@ -97,4 +109,129 @@ export interface HasManyThroughRepository<
       throughOptions?: Options;
     },
   ): Promise<void>;
+}
+
+export class DefaultHasManyThroughRepository<
+  TargetEntity extends Entity,
+  TargetID,
+  TargetRepository extends EntityCrudRepository<TargetEntity, TargetID>,
+  ThroughEntity extends Entity,
+  ThroughID,
+  ThroughRepository extends EntityCrudRepository<ThroughEntity, ThroughID>
+> implements HasManyThroughRepository<TargetEntity, TargetID, ThroughEntity> {
+  constructor(
+    public getTargetRepository: Getter<TargetRepository>,
+    public getThroughRepository: Getter<ThroughRepository>,
+    public getTargetConstraint: (
+      throughInstances: ThroughEntity[],
+    ) => DataObject<TargetEntity>,
+    public getThroughConstraint: (
+      targetInstance?: TargetEntity,
+    ) => DataObject<ThroughEntity>,
+  ) {}
+  async create(
+    targetModelData: DataObject<TargetEntity>,
+    options?: Options & {
+      throughData?: DataObject<ThroughEntity>;
+      throughOptions?: Options;
+    },
+  ): Promise<TargetEntity> {
+    const targetRepository = await this.getTargetRepository();
+    const throughRepository = await this.getThroughRepository();
+    const targetInstance = await targetRepository.create(
+      targetModelData,
+      options,
+    );
+    const throughConstraint = this.getThroughConstraint(targetInstance);
+    await throughRepository.create(
+      constrainDataObject(
+        options?.throughData ?? {},
+        throughConstraint as DataObject<ThroughEntity>,
+      ),
+      options?.throughOptions,
+    );
+    return targetInstance;
+  }
+
+  async find(
+    filter?: Filter<TargetEntity>,
+    options?: Options & {
+      throughOptions?: Options;
+    },
+  ): Promise<TargetEntity[]> {
+    const targetRepository = await this.getTargetRepository();
+    const throughRepository = await this.getThroughRepository();
+    const throughConstraint = this.getThroughConstraint();
+    const throughInstances = await throughRepository.find(
+      constrainFilter(undefined, throughConstraint),
+      options?.throughOptions,
+    );
+    const targetConstraint = this.getTargetConstraint(throughInstances);
+    return targetRepository.find(
+      constrainFilter(filter, targetConstraint),
+      options,
+    );
+  }
+
+  async delete(
+    where?: Where<TargetEntity>,
+    options?: Options & {
+      throughOptions?: Options;
+    },
+  ): Promise<Count> {
+    const targetRepository = await this.getTargetRepository();
+    const throughRepository = await this.getThroughRepository();
+    const throughConstraint = this.getThroughConstraint();
+    // TODO(derdeka): How to delete throughInstances?
+    const throughInstances = await throughRepository.find(
+      constrainFilter(undefined, throughConstraint),
+      options?.throughOptions,
+    );
+    const targetConstraint = this.getTargetConstraint(throughInstances);
+    return targetRepository.deleteAll(
+      constrainWhere(where, targetConstraint as Where<TargetEntity>),
+      options,
+    );
+  }
+
+  async patch(
+    dataObject: DataObject<TargetEntity>,
+    where?: Where<TargetEntity>,
+    options?: Options & {
+      throughOptions?: Options;
+    },
+  ): Promise<Count> {
+    const targetRepository = await this.getTargetRepository();
+    const throughRepository = await this.getThroughRepository();
+    const throughConstraint = this.getThroughConstraint();
+    const throughInstances = await throughRepository.find(
+      constrainFilter(undefined, throughConstraint),
+      options?.throughOptions,
+    );
+    const targetConstraint = this.getTargetConstraint(throughInstances);
+    return targetRepository.updateAll(
+      constrainDataObject(dataObject, targetConstraint),
+      constrainWhere(where, targetConstraint as Where<TargetEntity>),
+      options,
+    );
+  }
+
+  async link(
+    targetModelId: TargetID,
+    options?: Options & {
+      throughData?: DataObject<ThroughEntity>;
+      throughOptions?: Options;
+    },
+  ): Promise<TargetEntity> {
+    throw new Error('Method not implemented.');
+  }
+
+  async unlink(
+    targetModelId: TargetID,
+    options?: Options & {
+      throughOptions?: Options;
+    },
+  ): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
 }

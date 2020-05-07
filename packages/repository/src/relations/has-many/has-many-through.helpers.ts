@@ -50,11 +50,13 @@ export type HasManyThroughResolvedDefinition = HasManyDefinition & {
         categoryId: 2,
         productId: 8,
       }, {
-        id: 2,
+        id: 1,
         categoryId: 2,
         productId: 9,
       }
   ]);
+
+  >>> {id: {inq: [9, 8]}}
  * ```
  */
 export function createTargetConstraint<
@@ -98,6 +100,8 @@ export function createTargetConstraint<
  *  },
  * };
  * createThroughConstraint(resolvedMetadata, 1);
+ *
+ * >>> {'categoryId': 1}
  * ```
  */
 export function createThroughConstraint<Through extends Entity, ForeignKeyType>(
