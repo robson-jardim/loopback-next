@@ -227,6 +227,22 @@ export interface MiddlewareBindingOptions
    * Name of the middleware extension point. Default to `DEFAULT_MIDDLEWARE_CHAIN`.
    */
   chain?: string;
+
+  /**
+   * An array of group names as request phase dependencies for the middleware.
+   * For example, the  `invokeMethod` depends on `parseParams` for request
+   * processing. The `requestDependencies` for `invokeMethod` should be
+   * `['parseParams']`. The order of groups in the array does not matter.
+   */
+  requestDependencies?: string | string[];
+
+  /**
+   * An array of group names as response phase dependencies for the middleware.
+   * For example, the  `sendResponse` depends on `invokeMethod` for response
+   * processing. The `responseDependencies` for `sendResponse` should be
+   * `['invokeMethod']`. The order of groups in the array does not matter.
+   */
+  responseDependencies?: string | string[];
 }
 
 /**

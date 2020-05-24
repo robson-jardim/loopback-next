@@ -20,6 +20,7 @@ import {
 } from '@loopback/context';
 import {extensionFilter, extensionFor} from '@loopback/core';
 import debugFactory from 'debug';
+import {sortListOfGroups} from './group-sorter';
 import {DEFAULT_MIDDLEWARE_GROUP, MIDDLEWARE_NAMESPACE} from './keys';
 import {
   createInterceptor,
@@ -132,6 +133,18 @@ export function asMiddleware(
     binding
       .apply(extensionFor(options.chain ?? DEFAULT_MIDDLEWARE_CHAIN))
       .tag({group: options.group ?? DEFAULT_MIDDLEWARE_GROUP});
+    const reqDeps = options.requestDependencies;
+    if (reqDeps != null) {
+      binding.tag({
+        requestDependencies: typeof reqDeps === 'string' ? [reqDeps] : reqDeps,
+      });
+    }
+    const resDeps = options.responseDependencies;
+    if (resDeps != null) {
+      binding.tag({
+        responseDependencies: typeof resDeps === 'string' ? [resDeps] : resDeps,
+      });
+    }
   };
 }
 
@@ -198,9 +211,19 @@ export function invokeMiddleware(
     middlewareCtx.request.originalUrl,
     options,
   );
-  const {chain = DEFAULT_MIDDLEWARE_CHAIN, orderedGroups} = options ?? {};
+  const {chain = DEFAULT_MIDDLEWARE_CHAIN, orderedGroups = []} = options ?? {};
   // Find extensions for the given extension point binding
   const filter = extensionFilter(chain);
+
+  // Calculate orders from middleware dependencies
+  const ordersFromDependencies: string[][] = [];
+  middlewareCtx.find(filter).forEach(b => {
+    const group: string = b.tagMap.group ?? DEFAULT_MIDDLEWARE_GROUP;
+    const reqDeps: string[] = b.tagMap.requestDependencies ?? [];
+    reqDeps.forEach(d => ordersFromDependencies.push([d, group]));
+    const resDeps: string[] = b.tagMap.responseDependencies ?? [];
+    resDeps.forEach(d => ordersFromDependencies.push([group, d]));
+  });
   if (debug.enabled) {
     debug(
       'Middleware for extension point "%s":',
@@ -208,10 +231,11 @@ export function invokeMiddleware(
       middlewareCtx.find(filter).map(b => b.key),
     );
   }
+  const order = sortListOfGroups(orderedGroups, ...ordersFromDependencies);
   const _middlewareChain = new MiddlewareChain(
     middlewareCtx,
     filter,
-    compareBindingsByTag('group', orderedGroups),
+    compareBindingsByTag('group', order),
   );
   return _middlewareChain.invokeInterceptors(options?.next);
 }
