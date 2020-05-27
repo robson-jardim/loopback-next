@@ -192,31 +192,56 @@ export function tryWithFinally<T>(
   action: () => ValueOrPromise<T>,
   finalAction: () => void,
 ): ValueOrPromise<T> {
+  const errorAction = (err: unknown): never => {
+    throw err;
+  };
+  return tryCatchFinally(action, errorAction, finalAction);
+}
+
+/**
+ * Try to run an action that returns a promise or a value with error and final
+ * actions to mimic `try {} catch(err) {} finally {}` for a value or promise.
+ *
+ * @param action - A function that returns a promise or a value
+ * @param errorAction - A function to be called once the action
+ * is rejected (synchronously or asynchronously). It must throw an error.
+ * @param finalAction - A function to be called once the action
+ * is fulfilled or rejected (synchronously or asynchronously)
+ */
+export function tryCatchFinally<T>(
+  action: () => ValueOrPromise<T>,
+  errorAction: (err: unknown) => never = err => {
+    throw err;
+  },
+  finalAction: () => void = () => {},
+): ValueOrPromise<T> {
   let result: ValueOrPromise<T>;
   try {
     result = action();
   } catch (err) {
-    finalAction();
-    throw err;
+    reject(err);
   }
   if (isPromiseLike(result)) {
-    // Once (promise.finally)[https://github.com/tc39/proposal-promise-finally
-    // is supported, the following can be simplifed as
-    // `result = result.finally(finalAction);`
-    result = result.then(
-      val => {
-        finalAction();
-        return val;
-      },
-      err => {
-        finalAction();
-        throw err;
-      },
-    );
-  } else {
-    finalAction();
+    return (result = result.then(resolve, reject));
   }
-  return result;
+
+  return resolve(result);
+
+  function resolve(value: T) {
+    try {
+      return value;
+    } finally {
+      finalAction();
+    }
+  }
+
+  function reject(err: unknown): never {
+    try {
+      errorAction(err);
+    } finally {
+      finalAction();
+    }
+  }
 }
 
 /**

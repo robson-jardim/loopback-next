@@ -10,6 +10,7 @@ import {
   resolveMap,
   resolveUntil,
   transformValueOrPromise,
+  tryCatchFinally,
   tryWithFinally,
 } from '../..';
 
@@ -31,6 +32,29 @@ describe('tryWithFinally', () => {
     expect(finalActionInvoked).to.be.true();
   });
 
+  it('skips error action for a fulfilled promise', async () => {
+    let errorActionInvoked = false;
+    const action = () => Promise.resolve(1);
+    const errorAction = (err: unknown) => {
+      errorActionInvoked = true;
+      throw err;
+    };
+    await tryCatchFinally(action, errorAction, () => {});
+    expect(errorActionInvoked).to.be.false();
+  });
+
+  it('skips error action for a resolved value', () => {
+    let errorActionInvoked = false;
+    const action = () => 1;
+    const errorAction = (err: unknown) => {
+      errorActionInvoked = true;
+      throw err;
+    };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    tryCatchFinally(action, errorAction, () => {});
+    expect(errorActionInvoked).to.be.false();
+  });
+
   it('performs final action for a rejected promise', async () => {
     let finalActionInvoked = false;
     const action = () => Promise.reject(new Error('error'));
@@ -47,6 +71,82 @@ describe('tryWithFinally', () => {
     const finalAction = () => (finalActionInvoked = true);
     expect(() => tryWithFinally(action, finalAction)).to.throw('error');
     expect(finalActionInvoked).to.be.true();
+  });
+
+  it('performs error action for a rejected promise', async () => {
+    let errorActionInvoked = false;
+    const errorAction = (err: unknown) => {
+      errorActionInvoked = true;
+      throw err;
+    };
+    const action = () => Promise.reject(new Error('error'));
+    const finalAction = () => true;
+    await expect(
+      tryCatchFinally(action, errorAction, finalAction),
+    ).be.rejectedWith('error');
+    expect(errorActionInvoked).to.be.true();
+  });
+
+  it('performs error action for an action that throws an error', () => {
+    let errorActionInvoked = false;
+    const errorAction = (err: unknown) => {
+      errorActionInvoked = true;
+      throw err;
+    };
+    const action = () => {
+      throw new Error('error');
+    };
+    const finalAction = () => true;
+    expect(() => tryCatchFinally(action, errorAction, finalAction)).to.throw(
+      'error',
+    );
+    expect(errorActionInvoked).to.be.true();
+  });
+
+  it('skips error action for rejection from the final action', async () => {
+    let errorActionInvoked = false;
+    const errorAction = (err: unknown) => {
+      errorActionInvoked = true;
+      throw err;
+    };
+    const action = () => Promise.resolve(1);
+    const finalAction = () => {
+      throw new Error('error');
+    };
+    await expect(
+      tryCatchFinally(action, errorAction, finalAction),
+    ).be.rejectedWith('error');
+    expect(errorActionInvoked).to.be.false();
+  });
+
+  it('skips error action for error from the final action', () => {
+    let errorActionInvoked = false;
+    const errorAction = (err: unknown) => {
+      errorActionInvoked = true;
+      throw err;
+    };
+    const action = () => 1;
+    const finalAction = () => {
+      throw new Error('error');
+    };
+    expect(() => tryCatchFinally(action, errorAction, finalAction)).to.throw(
+      'error',
+    );
+    expect(errorActionInvoked).to.be.false();
+  });
+
+  it('allows default error action', () => {
+    const action = () => {
+      throw new Error('error');
+    };
+    expect(() => tryCatchFinally(action)).to.throw('error');
+  });
+
+  it('allows default error action for rejected promise', () => {
+    const action = () => {
+      return Promise.reject(new Error('error'));
+    };
+    return expect(tryCatchFinally(action)).to.be.rejectedWith('error');
   });
 });
 
