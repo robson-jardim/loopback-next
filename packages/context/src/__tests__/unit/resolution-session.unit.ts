@@ -4,7 +4,8 @@
 // License text available at https://opensource.org/licenses/MIT
 
 import {expect} from '@loopback/testlab';
-import {Binding, inject, Injection, ResolutionSession} from '../..';
+import {Binding, Context, inject, Injection, ResolutionSession} from '../..';
+import {ResolutionError} from '../../resolution-session';
 
 describe('ResolutionSession', () => {
   class MyController {
@@ -279,5 +280,62 @@ describe('ResolutionSession', () => {
       expect(session1.bindingStack).to.be.eql([bindingA]);
       expect(session1.injectionStack).to.be.eql([]);
     });
+  });
+
+  describe('ResolutionError', () => {
+    let cause: Error;
+    let resolutionErr: ResolutionError;
+
+    before(givenResolutionError);
+
+    it('includes contextual information in toString()', () => {
+      expect(resolutionErr.toString()).to.eql(
+        "ResolutionError: Fail to resolve binding 'b' in context 'test'. " +
+          '(Path: a --> @MyController.constructor[0] --> b. ' +
+          'Cause: Binding not found.)',
+      );
+    });
+
+    it('includes contextual information in toJSON()', () => {
+      expect(resolutionErr.toJSON()).to.eql({
+        message:
+          "Fail to resolve binding 'b' in context 'test'. " +
+          '(Path: a --> @MyController.constructor[0] --> b. ' +
+          'Cause: Binding not found.)',
+        context: 'test',
+        binding: 'b',
+        resolutionPath: 'a --> @MyController.constructor[0] --> b',
+        cause: 'Error: Binding not found',
+      });
+    });
+
+    it('includes contextual information in stringified json', () => {
+      expect(JSON.stringify(resolutionErr, null, 2)).to.eql(
+        JSON.stringify(resolutionErr.toJSON(), null, 2),
+      );
+    });
+
+    it('includes stack trace from the cause', () => {
+      expect(resolutionErr.stack?.includes(cause.stack!)).to.be.true();
+    });
+
+    function givenResolutionError() {
+      const ctx = new Context('test');
+      const bindingA = new Binding('a');
+      ctx.add(bindingA);
+      session.pushBinding(bindingA);
+      const injection: Injection = givenInjection();
+      session.pushInjection(injection);
+      const bindingB = new Binding('b');
+      ctx.add(bindingB);
+      session.pushBinding(bindingB);
+      cause = new Error('Binding not found');
+      resolutionErr = new ResolutionError(cause, {
+        options: {session},
+        context: ctx,
+        binding: bindingB,
+      });
+      return resolutionErr;
+    }
   });
 });

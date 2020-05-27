@@ -394,3 +394,72 @@ export interface ResolutionContext<T = unknown> {
    */
   readonly options: ResolutionOptions;
 }
+
+/**
+ * Throw a resolution error
+ * @param err - The original err
+ * @param resolutionContext - Resolution context
+ */
+export function throwResolutionError(
+  err: unknown,
+  resolutionContext: ResolutionContext,
+): never {
+  if (err instanceof ResolutionError) throw err;
+  throw new ResolutionError(err, resolutionContext);
+}
+
+/**
+ * Error for context binding resolutions and dependency injections
+ */
+export class ResolutionError extends Error {
+  /**
+   * The root cause of the resolution error
+   */
+  readonly cause: unknown;
+  /**
+   * Contextual data for the resolution
+   */
+  readonly resolutionContext: ResolutionContext;
+
+  constructor(err: unknown, resolutionContext: ResolutionContext) {
+    super(ResolutionError.buildMessage(err, resolutionContext));
+    this.cause = err;
+    // Capture the stack trace and join it with the cause
+    Error.captureStackTrace(this, ResolutionError);
+    if (err instanceof Error && err.stack) {
+      this.stack = `${this.stack}\nCaused by: ${err.stack}`;
+    }
+    this.name = ResolutionError.name;
+    this.resolutionContext = resolutionContext;
+  }
+
+  /**
+   * Build the error message for the resolution to include more contextual data
+   * @param cause - Cause of the error
+   * @param resolutionContext - Resolution context
+   */
+  private static buildMessage(
+    cause: unknown,
+    resolutionContext: ResolutionContext<unknown>,
+  ) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    const bindingKey = resolutionContext.binding.key;
+    const contextName = resolutionContext.context.name;
+    const resolutionPath =
+      resolutionContext.options.session?.getResolutionPath() ?? '';
+    const message =
+      `Fail to resolve binding '${bindingKey}' in context ` +
+      `'${contextName}'. (Path: ${resolutionPath}. Cause: ${reason}.)`;
+    return message;
+  }
+
+  toJSON() {
+    return {
+      message: this.message,
+      context: this.resolutionContext.context.name,
+      binding: this.resolutionContext.binding.key,
+      resolutionPath: this.resolutionContext.options.session?.getResolutionPath(),
+      cause: String(this.cause),
+    };
+  }
+}
