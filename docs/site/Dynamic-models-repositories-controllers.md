@@ -86,6 +86,7 @@ In case you need to use an existing Model as the base class, you should use the
 
 ```ts
 import DynamicModelCtor from '@loopback/repository';
+// Assuming User is a pre-existing Model class in the app
 const StudentModel = new DynamicModelCtor(User, studentDef);
 ```
 
@@ -120,11 +121,27 @@ on `RepositoryMixin` apps.
 Now that a datasource is ready, a repository can be created for `BookModel`.
 
 The `@loopback/rest-crud` package exports a helper function,
-`defineCrudRepositoryClass`, this function creates an entity CRUD repository
-class for the given model.
+`defineCrudRepositoryClass`, this function creates a
+`defineCrudRepositoryClass`-based entity CRUD repository class for the given
+model.
 
 ```ts
 const BookRepository = defineCrudRepositoryClass(BookModel);
+```
+
+If you want to customize the repository, you can create a copy of
+`defineCrudRepositoryClass`'s
+[implementation](https://github.com/strongloop/loopback-next/blob/00917f5a06ea8a51e1f452f228a6b0b7314809be/packages/rest-crud/src/repository-builder.ts#L25-L47)
+and modify it according to your requirements.
+
+If you want to use a non-`defineCrudRepositoryClass` repository class as the
+base for your repository, you can use the `defineRepositoryClass()` function
+instead.
+
+```ts
+import defineRepositoryClass from '@loopback/repository';
+// Assuming UserRepository is a pre-existing Repository class in the app
+const StudentRepository = defineRepositoryClass(BookModel, UserRepository);
 ```
 
 Dependency injection has to be manually done for the datasource as shown below.
@@ -134,8 +151,8 @@ inject(`datasources.${dsName.name}`)(BookRepository, undefined, 0);
 const repoBinding = app.repository(BookRepository);
 ```
 
-Note, the `app.repository()` method will be available only
-on `RepositoryMixin` apps.
+Note, the `app.repository()` method will be available only on `RepositoryMixin`
+apps.
 
 ### Defining a Controller
 
@@ -159,7 +176,7 @@ app.controller(BookController);
 
 The new CRUD REST endpoints for the model will be available on the app now.
 
-If want a customized controller, you can create a copy of
+If you want a customized controller, you can create a copy of
 `defineCrudRestController`'s
 [implementation](https://github.com/strongloop/loopback-next/blob/00917f5a06ea8a51e1f452f228a6b0b7314809be/packages/rest-crud/src/crud-rest.controller.ts#L129-L269)
 and modify it according to your requirements.
